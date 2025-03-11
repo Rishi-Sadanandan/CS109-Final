@@ -807,3 +807,21 @@ function displayFullReport(reportHtml) {
         });
     }
 }
+
+// Update this function to handle both API responses and fallback responses
+function processOpenAIResponse(response) {
+    if (response.error) {
+        console.error("API Error:", response.error);
+        return "I'm sorry, I encountered an error. Please try again.";
+    }
+    
+    // Check if we have choices in the response
+    if (response.choices && response.choices.length > 0) {
+        // Extract the message content
+        const messageContent = response.choices[0].message.content;
+        return messageContent;
+    }
+    
+    console.error("Unexpected response format:", response);
+    return "I received an unexpected response format. Please try again.";
+}

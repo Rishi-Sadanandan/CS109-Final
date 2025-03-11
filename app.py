@@ -4,9 +4,15 @@ import requests
 from modules.text_classifier import TextClassifier
 from modules.bayesian_fusion import BayesianFusion
 import json
+from openai import OpenAI
+from dotenv import load_dotenv
 
-# Simple API key variable - replace with your actual OpenAI API key
-OPENAI_API_KEY = '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'
+# Load environment variables at the top of your file
+load_dotenv()
+
+# Get API key from environment variable
+openai_api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=openai_api_key)
 
 app = Flask(__name__, static_folder='static')
 text_classifier = TextClassifier()
@@ -105,25 +111,69 @@ def check_api_key():
 
 @app.route('/openai_proxy', methods=['POST'])
 def openai_proxy():
-    """
-    Proxy endpoint for OpenAI API to handle the API key securely
-    """
     try:
-        # Get the request data
+        # Get request data
         data = request.json
+        print("Request data:", data)  # Debug print
         
-        # Make the request to OpenAI API
-        headers = {
-            'Content-Type': 'application/json',
-            'Authorization': f'Bearer {OPENAI_API_KEY}'
-        }
+        # Check if API key is available
+        if not openai_api_key:
+            print("ERROR: No OpenAI API key found")
+            # Return a fallback response instead of an error
+            return jsonify({
+                "choices": [
+                    {
+                        "message": {
+                            "content": "I'm sorry, but I'm currently operating in fallback mode due to API configuration issues. Please try again later.",
+                            "role": "assistant"
+                        },
+                        "index": 0,
+                        "finish_reason": "stop"
+                    }
+                ]
+            })
         
-        response = requests.post(OPENAI_API_URL, json=data, headers=headers)
-        
-        # Return the response from OpenAI
-        return response.json(), response.status_code
+        # Use the OpenAI client
+        try:
+            response = client.chat.completions.create(
+                model=data.get('model', 'gpt-3.5-turbo'),
+                messages=data.get('messages', []),
+                temperature=data.get('temperature', 0.7)
+            )
+            
+            # Convert the response to a dictionary
+            return jsonify(response.model_dump())
+        except Exception as api_error:
+            print(f"OpenAI API Error: {str(api_error)}")
+            
+            # Return a fallback response that the frontend can handle
+            return jsonify({
+                "choices": [
+                    {
+                        "message": {
+                            "content": "I'm sorry, but I'm having trouble connecting to my knowledge base. Let me provide a general response instead.",
+                            "role": "assistant"
+                        },
+                        "index": 0,
+                        "finish_reason": "stop"
+                    }
+                ]
+            })
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(f"General Error in openai_proxy: {str(e)}")
+        # Return a structured response that the frontend can handle
+        return jsonify({
+            "choices": [
+                {
+                    "message": {
+                        "content": "I apologize, but I encountered an error processing your request. Please try again.",
+                        "role": "assistant"
+                    },
+                    "index": 0,
+                    "finish_reason": "stop"
+                }
+            ]
+        })
 
 @app.route('/analyze_emotion', methods=['POST'])
 def analyze_emotion():
@@ -139,16 +189,10 @@ def analyze_emotion():
         if not text:
             return jsonify({'error': 'No text provided'}), 400
         
-        # Prepare the request to OpenAI
-        headers = {
-            'Content-Type': 'application/json',
-            'Authorization': f'Bearer {OPENAI_API_KEY}'
-        }
-        
-        # Create a prompt that asks for emotional analysis
-        prompt = {
-            "model": "gpt-3.5-turbo",
-            "messages": [
+        # Use the OpenAI client instead of raw requests
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
                 {
                     "role": "system",
                     "content": """You are an emotional analysis AI. Analyze the emotional content of the user's message and classify it as happy, neutral, or sad.
@@ -165,19 +209,12 @@ def analyze_emotion():
                     "content": text
                 }
             ],
-            "temperature": 0.3,
-            "max_tokens": 60
-        }
+            temperature=0.3,
+            max_tokens=60
+        )
         
-        # Make the request to OpenAI
-        response = requests.post(OPENAI_API_URL, json=prompt, headers=headers)
-        
-        if response.status_code != 200:
-            return jsonify({'error': f'OpenAI API error: {response.text}'}), 500
-        
-        # Parse the response
-        result = response.json()
-        content = result.get('choices', [{}])[0].get('message', {}).get('content', '{}')
+        # Get the content from the response
+        content = response.choices[0].message.content
         
         try:
             # Try to parse the JSON response
@@ -185,7 +222,6 @@ def analyze_emotion():
             
             # Validate the response format
             if not all(k in emotion_data for k in ['happy', 'neutral', 'sad']):
-                # If the response doesn't have the expected keys, return a default distribution
                 return jsonify({
                     'emotion_distribution': {'happy': 0.33, 'neutral': 0.34, 'sad': 0.33},
                     'error': 'Invalid response format from OpenAI'
@@ -195,14 +231,13 @@ def analyze_emotion():
             return jsonify({'emotion_distribution': emotion_data}), 200
             
         except json.JSONDecodeError:
-            # If the response isn't valid JSON, return a default distribution
             return jsonify({
                 'emotion_distribution': {'happy': 0.33, 'neutral': 0.34, 'sad': 0.33},
                 'error': 'Failed to parse OpenAI response'
             }), 200
             
     except Exception as e:
-        # Return a default distribution in case of any error
+        print(f"Error in analyze_emotion: {str(e)}")  # Add this debug line
         return jsonify({
             'emotion_distribution': {'happy': 0.33, 'neutral': 0.34, 'sad': 0.33},
             'error': str(e)
@@ -214,4 +249,4 @@ if __name__ == '__main__':
     os.makedirs('templates', exist_ok=True)
     os.makedirs('modules', exist_ok=True)
     
-    app.run(debug=True, port=5000) 
+    app.run(debug=True, port=os.getenv('PORT')) 
