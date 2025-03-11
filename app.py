@@ -6,7 +6,7 @@ from modules.bayesian_fusion import BayesianFusion
 import json
 
 # Simple API key variable - replace with your actual OpenAI API key
-OPENAI_API_KEY = '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'
+OPENAI_API_KEY = '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'
 
 app = Flask(__name__, static_folder='static')
 text_classifier = TextClassifier()
