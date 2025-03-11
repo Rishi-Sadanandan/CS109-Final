@@ -11,3 +11,4 @@ pandas
 matplotlib
 requests
 python-dotenv
+openai
