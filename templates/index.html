@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bayesian Mood Buddy</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/report-styles.css') }}">
+    <!-- Chart.js for visualizing mood distribution -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Face-api.js for face detection and expression recognition -->
+    <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <!-- Web Speech API for speech recognition and synthesis -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <i class="fas fa-brain"></i>
+                <h1>Bayesian Mood Buddy</h1>
+            </div>
+            <p>AI-powered emotional intelligence using Bayesian inference</p>
+        </header>
+
+        <main>
+            <div class="session-controls">
+                <button id="start-session" class="session-btn"><i class="fas fa-play-circle"></i> Start Session</button>
+                <button id="end-session" class="session-btn hidden"><i class="fas fa-stop-circle"></i> End Session</button>
+                <div class="session-status">
+                    <span id="session-indicator" class="inactive">Session Inactive</span>
+                    <span id="session-time">00:00</span>
+                </div>
+            </div>
+
+            <div class="dual-analysis-display">
+                <div class="mood-display">
+                    <h2><i class="fas fa-comment-dots"></i> Text Analysis</h2>
+                    <div class="mood-indicator">
+                        <div id="mood-emoji">😐</div>
+                        <div id="mood-label">Analyzing your messages...</div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="mood-chart"></canvas>
+                    </div>
+                    <div class="mood-insights">
+                        <p id="mood-insight">I'll analyze the emotions in your messages.</p>
+                    </div>
+                </div>
+                
+                <div class="facial-display">
+                    <h2><i class="fas fa-camera"></i> Facial Analysis</h2>
+                    <div id="facial-emotion-display" class="facial-emotion-display">
+                        <div class="facial-emotion-emoji">😐</div>
+                        <div class="facial-emotion-label">Camera inactive</div>
+                    </div>
+                    <div class="emotion-timeline">
+                        <h3>Emotional Trends</h3>
+                        <div id="emotion-stats">
+                            <div class="stat-item">
+                                <span class="stat-label">Stability:</span>
+                                <span id="emotion-stability">Unknown</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Trend:</span>
+                                <span id="emotion-trend">Unknown</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Confidence:</span>
+                                <span id="emotion-confidence">Low</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="interaction-panel">
+                <div class="camera-section">
+                    <h2><i class="fas fa-video"></i> Camera Feed</h2>
+                    <div class="camera-container">
+                        <video id="video" autoplay muted></video>
+                        <canvas id="overlay"></canvas>
+                        <div class="camera-status-overlay">
+                            <div id="camera-status">Camera inactive</div>
+                        </div>
+                    </div>
+                    <div class="camera-controls">
+                        <button id="start-camera" class="primary-btn"><i class="fas fa-play"></i> Start Camera</button>
+                        <button id="stop-camera" class="secondary-btn"><i class="fas fa-stop"></i> Stop Camera</button>
+                    </div>
+                </div>
+
+                <div class="chat-section">
+                    <h2><i class="fas fa-comments"></i> Conversation</h2>
+                    <div id="chat-messages"></div>
+                    <div class="chat-controls">
+                        <div class="chat-input">
+                            <input type="text" id="text-input" placeholder="Tell me how you're feeling...">
+                            <button id="send-button" class="primary-btn"><i class="fas fa-paper-plane"></i></button>
+                        </div>
+                        <div class="voice-controls">
+                            <button id="start-voice" class="voice-btn"><i class="fas fa-microphone"></i></button>
+                            <button id="stop-voice" class="voice-btn hidden"><i class="fas fa-microphone-slash"></i></button>
+                            <span id="voice-status"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="controls-section">
+                <h2><i class="fas fa-sliders-h"></i> Controls</h2>
+                <div class="control-buttons">
+                    <button id="correct-mood" class="action-btn"><i class="fas fa-edit"></i> Correct Mood</button>
+                    <button id="reset-system" class="action-btn"><i class="fas fa-redo"></i> Reset System</button>
+                    <button id="toggle-voice" class="action-btn"><i class="fas fa-volume-up"></i> <span id="voice-toggle-text">Mute Voice</span></button>
+                    <button id="generate-full-report" class="action-btn"><i class="fas fa-file-alt"></i> Generate Full Report</button>
+                </div>
+                <div id="correction-options" class="hidden">
+                    <button data-mood="happy" class="mood-btn happy-btn"><i class="fas fa-smile"></i> I'm Happy</button>
+                    <button data-mood="neutral" class="mood-btn neutral-btn"><i class="fas fa-meh"></i> I'm Neutral</button>
+                    <button data-mood="sad" class="mood-btn sad-btn"><i class="fas fa-frown"></i> I'm Sad</button>
+                    <button id="cancel-correction" class="cancel-btn"><i class="fas fa-times"></i> Cancel</button>
+                </div>
+                
+                <!-- OpenAI API Key Input Form - Hidden since we're using a hardcoded key -->
+                <div class="api-key-section" style="display: none;">
+                    <h3><i class="fas fa-key"></i> OpenAI API Key</h3>
+                    <div class="api-key-form">
+                        <input type="password" id="api-key-input" placeholder="Enter your OpenAI API key">
+                        <button id="save-api-key" class="primary-btn"><i class="fas fa-save"></i> Save Key</button>
+                    </div>
+                    <div id="api-key-status">API key is set. AI responses are enabled.</div>
+                </div>
+            </div>
+            
+            <div class="bayesian-explanation">
+                <h2><i class="fas fa-graduation-cap"></i> Bayesian Methodology</h2>
+                <div class="explanation-content">
+                    <p>This system uses Bayesian inference to analyze emotions from multiple sources:</p>
+                    <ol>
+                        <li><strong>Text Analysis:</strong> Analyzes sentiment in your messages using Naive Bayes classification</li>
+                        <li><strong>Facial Analysis:</strong> Detects emotions from facial expressions using computer vision</li>
+                        <li><strong>Correlation Analysis:</strong> Compares text and facial emotions to identify patterns and discrepancies</li>
+                        <li><strong>Comprehensive Report:</strong> Combines all data using Bayesian methods to provide insights</li>
+                    </ol>
+                    <p>The system analyzes each source independently and then compares them in the final report.</p>
+                    <div class="cs109-concepts">
+                        <h3>CS109 Concepts Applied:</h3>
+                        <ul>
+                            <li><strong>Bayes' Rule:</strong> Updating beliefs based on new evidence</li>
+                            <li><strong>Naive Bayes:</strong> Used for text sentiment classification</li>
+                            <li><strong>Temporal Smoothing:</strong> Reducing noise in emotional measurements using exponential smoothing</li>
+                            <li><strong>Maximum A Posteriori (MAP):</strong> Selecting the most likely mood state</li>
+                            <li><strong>Correlation Analysis:</strong> Measuring alignment between facial expressions and text sentiment</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>Bayesian Mood Buddy - Emotional Intelligence Powered by CS109 Bayesian Methods</p>
+            <p class="small">Using real-time Bayesian inference to combine facial expression and linguistic sentiment analysis</p>
+        </footer>
+    </div>
+
+    <!-- JavaScript files -->
+    <script src="{{ url_for('static', filename='js/chart-config.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/openai-handler.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/conversation-analysis.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/text-analysis.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/bayesian-update.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/face-detection.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/speech-handler.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/direct-report.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    
+    <!-- Initialize global variables -->
+    <script>
+        // Initialize global variables to prevent undefined errors
+        window.sessionDuration = 0;
+        window.sessionStartTime = Date.now();
+        window.speechSynthesisEnabled = true;
+        window.speechQueue = [];
+        window.isSpeaking = false;
+        
+        // Ensure the conversation-analysis.js implementation is used for reports
+        document.addEventListener('DOMContentLoaded', function() {
+            // Wait a bit to ensure all scripts are loaded
+            setTimeout(function() {
+                console.log('INDEX.HTML: Checking if conversation-analysis.js is properly loaded');
+                
+                if (typeof window.generateComprehensiveReport === 'function') {
+                    console.log('INDEX.HTML: conversation-analysis.js implementation is available');
+                    
+                    // Store a reference to the conversation-analysis.js implementation
+                    window._conversationAnalysisReport = window.generateComprehensiveReport;
+                    
+                    // Override any other implementations
+                    console.log('INDEX.HTML: Ensuring conversation-analysis.js implementation is used');
+                    window.generateComprehensiveReport = window._conversationAnalysisReport;
+                } else {
+                    console.error('INDEX.HTML: conversation-analysis.js implementation is NOT available');
+                }
+            }, 500);
+        });
+    </script>
+
+    <script>
+        // Check if scripts are loaded correctly
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(function() {
+                console.log('Checking if scripts are loaded correctly...');
+                
+                // Check conversation-analysis.js
+                if (typeof window.generateComprehensiveReport === 'function') {
+                    console.log('conversation-analysis.js is loaded correctly');
+                } else {
+                    console.error('conversation-analysis.js is NOT loaded correctly');
+                }
+                
+                // Check direct-report.js
+                if (typeof window.directGenerateReport === 'function') {
+                    console.log('direct-report.js is loaded correctly');
+                } else {
+                    console.error('direct-report.js is NOT loaded correctly');
+                }
+                
+                // Check main.js
+                if (typeof window.generateFullReport === 'function') {
+                    console.log('main.js is loaded correctly');
+                } else {
+                    console.error('main.js is NOT loaded correctly');
+                }
+            }, 1000); // Check after 1 second to ensure all scripts have loaded
+        });
+    </script>
+</body>
+</html> 
