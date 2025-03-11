@@ -21,6 +21,13 @@ bayesian_fusion = BayesianFusion()
 # OpenAI API URL
 OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions'
 
+# Use environment variables with defaults
+app.config.update(
+    PORT=int(os.getenv('PORT', 5000)),
+    DEBUG=os.getenv('FLASK_ENV', 'production') == 'development',
+    OPENAI_API_KEY=os.getenv('OPENAI_API_KEY'),
+)
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -249,4 +256,5 @@ if __name__ == '__main__':
     os.makedirs('templates', exist_ok=True)
     os.makedirs('modules', exist_ok=True)
     
-    app.run(debug=True, port=os.getenv('PORT')) 
+    port = int(os.getenv('PORT', 5000))
+    app.run(host='0.0.0.0', port=port) 

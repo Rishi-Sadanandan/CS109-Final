@@ -12,3 +12,4 @@ matplotlib
 requests
 python-dotenv
 openai
+gunicorn
