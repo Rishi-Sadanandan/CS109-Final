@@ -88,10 +88,6 @@ The system implements Bayesian inference as follows:
 - **Conditional Independence** assumptions in the Bayesian model
 - **Probability Distributions** for representing uncertainty
 
-## License
-
-MIT
-
 ## Acknowledgments
 
 - face-api.js for facial expression recognition
